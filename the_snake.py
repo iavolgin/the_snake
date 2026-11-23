@@ -13,6 +13,12 @@ UP = (0, -1)
 DOWN = (0, 1)
 LEFT = (-1, 0)
 RIGHT = (1, 0)
+KEY_DIRECTIONS = {
+    pygame.K_UP: UP,
+    pygame.K_DOWN: DOWN,
+    pygame.K_LEFT: LEFT,
+    pygame.K_RIGHT: RIGHT,
+}
 
 # Цвет фона - черный:
 BOARD_BACKGROUND_COLOR = (0, 0, 0)
@@ -39,7 +45,14 @@ pygame.display.set_caption('Змейка')
 clock = pygame.time.Clock()
 
 
-# Тут опишите все классы игры.
+def draw_cell(position, color, border_color=BORDER_COLOR):
+    """Рисует клетку заданным цветом и добавляет обводку, если она задана."""
+    rect = pygame.Rect(position, (GRID_SIZE, GRID_SIZE))
+    pygame.draw.rect(screen, color, rect)
+    if border_color is not None:
+        pygame.draw.rect(screen, border_color, rect, 1)
+
+
 class GameObject:
     """Базовый класс объектов игры."""
 
@@ -50,7 +63,7 @@ class GameObject:
 
     def draw(self):
         """Отрисовывает объект на игровом поле."""
-        pass
+        raise NotImplementedError
 
 
 class Apple(GameObject):
@@ -75,12 +88,8 @@ class Apple(GameObject):
 
     def draw(self):
         """Рисует яблоко с обводкой в его клетке."""
-        if self.position is None:
-            return
-
-        rect = pygame.Rect(self.position, (GRID_SIZE, GRID_SIZE))
-        pygame.draw.rect(screen, self.body_color, rect)
-        pygame.draw.rect(screen, BORDER_COLOR, rect, 1)
+        if self.position is not None:
+            draw_cell(self.position, self.body_color)
 
 
 class Snake(GameObject):
@@ -110,16 +119,9 @@ class Snake(GameObject):
             return self.positions.pop()
         return None
 
-    def draw(self, tail=None):
-        """Затирает след хвоста и рисует все сегменты змейки."""
-        if tail is not None:
-            tail_rect = pygame.Rect(tail, (GRID_SIZE, GRID_SIZE))
-            pygame.draw.rect(screen, BOARD_BACKGROUND_COLOR, tail_rect)
-
-        for position in self.positions:
-            rect = pygame.Rect(position, (GRID_SIZE, GRID_SIZE))
-            pygame.draw.rect(screen, self.body_color, rect)
-            pygame.draw.rect(screen, BORDER_COLOR, rect, 1)
+    def draw(self):
+        """Рисует голову змейки в её текущей клетке."""
+        draw_cell(self.get_head_position(), self.body_color)
 
     def get_head_position(self):
         """Возвращает координаты головы змейки."""
@@ -135,19 +137,16 @@ class Snake(GameObject):
 
 def handle_keys(game_object):
     """Обрабатывает стрелки и закрытие окна игры."""
+    direction_x, direction_y = game_object.direction
+    opposite_direction = (-direction_x, -direction_y)
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
             raise SystemExit
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_UP and game_object.direction != DOWN:
-                game_object.next_direction = UP
-            elif event.key == pygame.K_DOWN and game_object.direction != UP:
-                game_object.next_direction = DOWN
-            elif event.key == pygame.K_LEFT and game_object.direction != RIGHT:
-                game_object.next_direction = LEFT
-            elif event.key == pygame.K_RIGHT and game_object.direction != LEFT:
-                game_object.next_direction = RIGHT
+            direction = KEY_DIRECTIONS.get(event.key)
+            if direction is not None and direction != opposite_direction:
+                game_object.next_direction = direction
 
 
 def main():
@@ -156,6 +155,7 @@ def main():
     snake = Snake()
     apple = Apple(snake.positions)
     screen.fill(BOARD_BACKGROUND_COLOR)
+    snake.draw()
 
     while True:
         clock.tick(SPEED)
@@ -174,9 +174,10 @@ def main():
             snake.reset()
             apple.randomize_position(snake.positions)
             screen.fill(BOARD_BACKGROUND_COLOR)
-            tail = None
+        elif tail is not None:
+            draw_cell(tail, BOARD_BACKGROUND_COLOR, border_color=None)
 
-        snake.draw(tail)
+        snake.draw()
         apple.draw()
         pygame.display.update()
 
